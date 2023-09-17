@@ -82,7 +82,7 @@ function moon_day(today) {
 }
 var angle = moon_day(new Date()) * 360;
 const degrees = [0, 45, 90, 135, 180, 225, 270, 315];
-var index_moon_phase_curr = Math.trunc(angle / 45) % degrees.length;
+var index_moon_phase_curr = Math.round(angle / 45) % degrees.length;
 document.title =
   document.title + " " + moon_phases_emoji[index_moon_phase_curr];
 // console.log(index_moon_phase_curr);
