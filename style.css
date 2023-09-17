@@ -1,0 +1,108 @@
+@font-face {
+  font-family: Majestic;
+  src: url("Fonts/MajesticPersonalUseRegular-ZVP3B.ttf");
+}
+@font-face {
+  font-family: Yatra;
+  src: url("Fonts/YatraOne-Regular.ttf");
+}
+@font-face {
+  font-family: Saturday Moon;
+  src: url("/Fonts/SaturdayMoonDemo-PK5lx.ttf");
+}
+@font-face {
+  font-family: Khand;
+  src: url("/Fonts/Khand-SemiBold.ttf");
+}
+canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+}
+#info {
+  font-size: 4vw;
+  font-family: "Belanosima", sans-serif;
+  text-shadow: rgb(76, 0, 255) 2px 0 20px;
+  color: rgb(185, 124, 255);
+
+  position: absolute;
+  top: 10px;
+
+  height: 5%;
+
+  left: 0;
+  right: 0;
+
+  margin: auto;
+  text-align: center;
+  z-index: 100;
+}
+#title_en {
+  font-family: Saturday Moon;
+}
+#title_hi {
+  font-family: Khand;
+}
+*,
+:before,
+:after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  display: flex;
+  justify-content: center;
+  min-height: 100vh;
+  align-items: center;
+}
+
+#btn {
+  position: relative;
+  font-weight: 600;
+  height: 40px;
+  padding: 12px 20px;
+  outline: none;
+  color: #ffffff;
+  border: 1px solid rgb(255, 255, 255);
+  background-color: transparent;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+#btn:after {
+  content: "";
+  position: absolute;
+  width: 100%;
+  top: 7px;
+  left: 7px;
+  height: 100%;
+  background-color: rgba(201, 184, 246, 0.272);
+  z-index: -1;
+  transition: all 0.35s;
+  border-radius: inherit;
+}
+
+#btn:hover:after {
+  top: 0px;
+  left: 0px;
+  background-color: rgb(201, 184, 246);
+}
+
+#curr_phase_name {
+  position: absolute;
+
+  top: 75vh;
+  right: 5vw;
+
+  font-size: 4vw;
+}
+#english {
+  font-family: Majestic;
+  color: rgb(190, 248, 0);
+}
+#hindi {
+  font-family: Yatra;
+  color: rgb(255, 0, 200);
+}
