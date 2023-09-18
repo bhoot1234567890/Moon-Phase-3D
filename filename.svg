@@ -1,0 +1,9 @@
+<?xml version="1.0" standalone="no"?>
+<svg width="12cm" height="5.25cm" viewBox="0 0 1200 400" xmlns="http://www.w3.org/2000/svg" version="1.1">
+   <title>Example arcs01 - arc commands in path data</title>
+
+   <circle cx="100" cy="75" r="75" fill="#e4fd58" stroke="blue" stroke-width="1" />
+   <path d="m100,0 a10,20 0 1,1 0,150 a20,20 0 0,0 0,-150" fill="rgba(0,0,0,0.695)" stroke="red" stroke-width="1" />
+
+
+</svg>
