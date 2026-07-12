@@ -341,3 +341,35 @@ body {
   border-color: transparent;
   color: #fff;
 }
+
+/* ===== Features master toggle (in #info, always visible) ===== */
+.feature-toggle {
+  position: relative;
+  font-weight: 600;
+  height: 40px;
+  padding: 12px 18px;
+  outline: none;
+  color: #ece4ff;
+  border: 1px solid var(--dp-line, rgba(201, 184, 246, 0.35));
+  background: var(--dp-glass, rgba(20, 14, 36, 0.72));
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border-radius: 5px;
+  cursor: pointer;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.feature-toggle:hover {
+  border-color: var(--dp-line-strong, rgba(201, 184, 246, 0.8));
+  box-shadow: 0 0 0 1px rgba(201, 184, 246, 0.2), 0 8px 24px rgba(120, 60, 220, 0.35);
+}
+.feature-toggle[aria-pressed="true"] {
+  background: linear-gradient(135deg, rgba(255, 0, 200, 0.85), rgba(122, 60, 255, 0.85));
+  border-color: transparent;
+  color: #fff;
+}
+
+/* ===== Clean mode: hide all feature chrome, keep the original UI ===== */
+body.features-hidden #toolbar,
+body.features-hidden [class*="mp-"] {
+  display: none !important;
+}

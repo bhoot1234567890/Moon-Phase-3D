@@ -36,14 +36,14 @@ const moon_phases_en = [
   "Waning Crescent",
 ];
 const moon_phases_hi = [
-  "नया चाँद/अमावस्या",
-  "शुक्ल पक्ष हंसिया चांद/वर्धमान चांद",
-  "पहली तिमाही/अर्द्ध चंद्र",
-  "शुक्ल पक्ष कुबड़ा चांद",
-  "पूर्णचंद/पूर्णिमा",
-  "कृष्ण पक्ष कुबड़ा चांद",
-  "अंतिम तिमाही/अर्द्ध चंद्र",
-  "कृष्ण पक्ष हंसिया चांद/वर्धमान चांद",
+  "अमावस्या (नया चाँद)",
+  "शुक्ल पक्ष का हंसिया चाँद (वर्धमान चाँद)",
+  "प्रथम तिमाही (अर्धचंद्र)",
+  "शुक्ल पक्ष का कुबड़ा चाँद",
+  "पूर्णिमा (पूर्ण चंद्र)",
+  "कृष्ण पक्ष का कुबड़ा चाँद",
+  "अंतिम (तृतीय) तिमाही (अर्धचंद्र)",
+  "कृष्ण पक्ष का हंसिया चाँद (क्षीणमान चाँद)",
 ];
 const moon_phases_emoji = ["🌑", "🌒", "🌓", "🌔", "🌕", "🌖", "🌗", "🌘"];
 
@@ -246,6 +246,10 @@ const features = [
   initSkyMap,
   initSystemView,
 ];
+// Snapshot core scene/moon children so feature-added 3D objects can be toggled.
+const coreScene = new Set(scene.children);
+const coreMoon = new Set(moon.children);
+
 for (const init of features) {
   try {
     init(ctx);
@@ -253,6 +257,49 @@ for (const init of features) {
     console.error("Feature init failed:", init.name, err);
   }
 }
+
+// Feature-added 3D objects (pins, bright stars, constellations) live in the
+// scene or as children of the moon. Toggle their .visible while remembering each
+// object's own visibility, so per-feature sub-toggles (Locations/Constellations)
+// survive a hide/show cycle.
+const featureObjects = [
+  ...scene.children.filter((o) => !coreScene.has(o)),
+  ...moon.children.filter((o) => !coreMoon.has(o)),
+];
+
+let featuresVisible = true;
+function setFeaturesVisible(visible) {
+  if (visible === featuresVisible) return;
+  featuresVisible = visible;
+  document.body.classList.toggle("features-hidden", !visible);
+  if (visible) {
+    for (const o of featureObjects) o.visible = o._savedVisible ?? true;
+  } else {
+    for (const o of featureObjects) {
+      o._savedVisible = o.visible;
+      o.visible = false;
+    }
+    // System View adds meshes lazily (not in the snapshot); turn it off if on.
+    const svBtn = [...document.querySelectorAll("#toolbar button")].find((b) =>
+      b.textContent.includes("System View")
+    );
+    if (svBtn && svBtn.getAttribute("aria-pressed") === "true") svBtn.click();
+  }
+  render();
+}
+ctx.setFeaturesVisible = setFeaturesVisible;
+
+const featureToggle = document.getElementById("featureToggle");
+if (featureToggle) {
+  featureToggle.addEventListener("click", () => {
+    const on = featureToggle.getAttribute("aria-pressed") !== "true";
+    featureToggle.setAttribute("aria-pressed", on ? "true" : "false");
+    setFeaturesVisible(on);
+  });
+}
+
+// Default: clean (only the original UI). The toggle reveals the new features.
+setFeaturesVisible(false);
 
 // --- Initial phase: today (emits 'date' so all features render initial state) ---
 setDate(new Date());
