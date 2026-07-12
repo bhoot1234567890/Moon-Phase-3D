@@ -17,8 +17,7 @@
     </div>
     <div id="curr_phase_name"></div>
 
-    <!-- Custom date picker (bottom-right). A hidden native input stays the
-         source of truth so main.js's existing change-listener drives the phase. -->
+    <!-- Custom date picker (bottom-right). calendar.js (imported by main.js) owns it. -->
     <div id="datePicker" class="date-picker">
       <button type="button" id="dateTrigger" class="date-trigger" aria-haspopup="dialog" aria-expanded="false">
         <svg class="date-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -42,10 +41,11 @@
         <div id="dpGrid" class="dp-grid"></div>
         <button type="button" id="dpToday" class="dp-today-btn">Today</button>
       </div>
-      <input type="date" id="dateInput" hidden />
     </div>
 
+    <!-- Shared feature toolbar (top-right); feature modules append buttons here -->
+    <div id="toolbar" class="toolbar"></div>
+
     <script type="module" src="/main.js"></script>
-    <script type="module" src="/calendar.js"></script>
   </body>
 </html>

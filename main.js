@@ -55,25 +55,18 @@ const camera = new PerspectiveCamera(
   0.1,
   1000
 );
-// MSAA only on low-density displays: at dpr >= 3 the physical pixels are small
-// enough to hide edge aliasing, so skip the fill-cost multiplier there.
 const antialias = window.devicePixelRatio < 3;
 const renderer = new WebGLRenderer({
   canvas: document.querySelector("#bg"),
   antialias,
 });
-// Cap at 2: above dpr=2 the extra sharpness is imperceptible but fill cost scales with dpr².
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 camera.position.set(0, 0, 80);
 
-// Survive GPU context loss (long backgrounding, driver reset): keep the context
-// restorable, then re-render on restore — three re-uploads textures lazily.
 const canvas = renderer.domElement;
 canvas.addEventListener("webglcontextlost", (e) => e.preventDefault());
-canvas.addEventListener("webglcontextrestored", () =>
-  renderer.render(scene, camera)
-);
+canvas.addEventListener("webglcontextrestored", () => renderer.render(scene, camera));
 
 // Phase is conveyed entirely by where the sun sits around the moon.
 const directionalLight = new DirectionalLight(0xffffff, 2);
@@ -82,6 +75,8 @@ scene.add(directionalLight);
 const controls = new OrbitControls(camera, renderer.domElement);
 
 // --- Starfield: one THREE.Points (1 draw call) instead of 200 individual meshes ---
+// Kept as a faint background layer; the skymap feature adds bright named stars
+// and constellations on top.
 function makeStars(count = 200) {
   const positions = new Float32Array(count * 3);
   for (let i = 0; i < count; i++) {
@@ -104,15 +99,15 @@ scene.add(makeStars(200));
 // --- Textures via a single LoadingManager (progress + real error reporting) ---
 const manager = new LoadingManager();
 manager.onError = (url) => console.error("Texture failed to load:", url);
-manager.onLoad = () => renderer.render(scene, camera); // first clean frame once decoded
+manager.onLoad = () => render();
 const loader = new TextureLoader(manager);
 
 const moonColorTex = loader.load(moonColorUrl);
-moonColorTex.colorSpace = SRGBColorSpace; // albedo is sRGB; without this the moon looks washed out
+moonColorTex.colorSpace = SRGBColorSpace;
 moonColorTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
 
-const moonNormalTex = loader.load(moonNormalUrl); // stays linear (correct for normals)
-const moonHeightTex = loader.load(moonHeightUrl); // LOLA DEM, drives displacement
+const moonNormalTex = loader.load(moonNormalUrl);
+const moonHeightTex = loader.load(moonHeightUrl);
 
 // --- Moon globe: real DEM displacement; normal map carries the surface relief ---
 const moon = new Mesh(
@@ -128,8 +123,49 @@ scene.add(moon);
 moon.rotateY((270 * Math.PI) / 180);
 directionalLight.target = moon;
 
-// --- Set the moon phase for a date: repositions the sun + updates the labels ---
-function applyPhase(date) {
+// =====================================================================
+// App context: the single integration point feature modules build against.
+// Features must NEVER touch the scene/date directly — only through `ctx`.
+// =====================================================================
+const listeners = Object.create(null);
+function on(evt, cb) {
+  (listeners[evt] ||= []).push(cb);
+  return () => off(evt, cb);
+}
+function once(evt, cb) {
+  const u = on(evt, (p) => {
+    u();
+    cb(p);
+  });
+  return u;
+}
+function off(evt, cb) {
+  const arr = listeners[evt];
+  if (arr) listeners[evt] = arr.filter((f) => f !== cb);
+}
+function emit(evt, payload) {
+  (listeners[evt] || []).slice().forEach((cb) => cb(payload));
+}
+
+const renderCallbacks = [];
+function onRender(cb) {
+  renderCallbacks.push(cb);
+  return () => {
+    const i = renderCallbacks.indexOf(cb);
+    if (i >= 0) renderCallbacks.splice(i, 1);
+  };
+}
+
+let currentDate = new Date();
+function render() {
+  renderer.render(scene, camera);
+  for (const cb of renderCallbacks.slice()) cb();
+}
+
+// Set the moon phase for a date: repositions the sun, updates labels, renders,
+// and notifies all date listeners. Single source of truth for the current date.
+function setDate(date) {
+  currentDate = date;
   const a = phaseAngle(date);
   const idx = phaseIndex(date);
   const sunangle = (a + 270) % 360;
@@ -145,41 +181,78 @@ function applyPhase(date) {
     "</span>";
   document.title = "Lunar Phases " + moon_phases_emoji[idx];
 
-  renderer.render(scene, camera);
+  render();
+  emit("date", date);
 }
 
-// --- Render on demand: the scene is static once a phase is set ---
-controls.addEventListener("change", () => renderer.render(scene, camera));
-renderer.render(scene, camera);
-
-// --- Date picker: recompute the phase without reloading the page ---
-const dateInput = document.getElementById("dateInput");
-if (dateInput) {
-  const now = new Date();
-  dateInput.value =
-    now.getFullYear() +
-    "-" +
-    String(now.getMonth() + 1).padStart(2, "0") +
-    "-" +
-    String(now.getDate()).padStart(2, "0");
-  dateInput.addEventListener("change", (e) => {
-    if (e.target.value) applyPhase(new Date(e.target.value + "T12:00:00"));
-  });
+function resetView() {
+  controls.reset();
+  render();
+  emit("reset");
 }
+
+const ctx = {
+  scene,
+  camera,
+  renderer,
+  moon,
+  controls,
+  directionalLight,
+  constants: { moonRadius: 20, lightRadius: 80, cameraZ: 80 },
+  THREE_USING: true, // (features import three themselves)
+  getDate: () => currentDate,
+  setDate,
+  onDate: (cb) => on("date", cb),
+  on,
+  once,
+  off,
+  emit,
+  render,
+  resetView,
+  onRender,
+};
+window.__moon = ctx;
+
+// --- Render on demand ---
+controls.addEventListener("change", render);
+render();
 
 // --- Keep the canvas correct on resize ---
 window.addEventListener("resize", () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.render(scene, camera);
+  render();
 });
 
-// --- Reset view ---
-document.getElementById("btn").addEventListener("click", () => {
-  controls.reset();
-  renderer.render(scene, camera);
-});
+// --- Reset view button ---
+document.getElementById("btn").addEventListener("click", resetView);
 
-// --- Initial phase: today ---
-applyPhase(new Date());
+// --- Feature modules (each exports init(ctx)) ---
+import { initCalendar } from "./calendar.js";
+import { initDataPanel } from "./features/datapanel.js";
+import { initTimeControls } from "./features/timecontrols.js";
+import { initViewControls } from "./features/viewcontrols.js";
+import { initLunarFeatures } from "./features/lunarfeatures.js";
+import { initSkyMap } from "./features/skymap.js";
+import { initSystemView } from "./features/systemview.js";
+
+const features = [
+  initCalendar,
+  initDataPanel,
+  initTimeControls,
+  initViewControls,
+  initLunarFeatures,
+  initSkyMap,
+  initSystemView,
+];
+for (const init of features) {
+  try {
+    init(ctx);
+  } catch (err) {
+    console.error("Feature init failed:", init.name, err);
+  }
+}
+
+// --- Initial phase: today (emits 'date' so all features render initial state) ---
+setDate(new Date());
