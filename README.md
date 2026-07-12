@@ -4,81 +4,106 @@
 ![Three.js](https://img.shields.io/badge/Three.js-^0.153.0-000000?logo=three.js&logoColor=white)
 ![Vite](https://img.shields.io/badge/Vite-^4.3.9-646CFF?logo=vite&logoColor=white)
 
-**A real-time, 3D visualization of tonight's Moon — rendered with the correct phase for the current date.**
+**🌐 Live demo: <https://moon-phase-3d.pages.dev>**
 
-Most "moon phase" widgets show a flat, abstract icon. Moon-Phase-3D instead renders a fully textured lunar globe with Three.js, then positions a directional "sun" light at the angle the Moon actually sits relative to the Sun today. The result is an interactive sphere whose illuminated terminator matches the real phase outside your window right now. Open it on any day and you see that day's Moon, with phase names shown in English and Hindi.
+A real-time, interactive 3D visualization of the Moon — rendered with the **correct phase for any date**, built with Three.js + Vite.
+
+Most "moon phase" widgets show a flat icon. Moon-Phase-3D renders a fully textured lunar globe and positions a directional "sun" light at the astronomically correct angle for the chosen date, so the illuminated terminator on the sphere matches the real Moon. Pick any date (or hit play and watch a full synodic cycle sweep by), drag to orbit, and read the phase in English and Hindi.
 
 ## ✨ Features
 
-- **Phase-accurate lighting** — a Julian-day lunar algorithm computes today's synodic age (29.53059-day cycle) and aims a directional light so the rendered terminator is the live one.
-- **NASA-grade surface detail** — the sphere is shaded with the LROC color-poles map plus normal and displacement maps for real craters and terrain relief.
-- **Fully interactive 3D** — drag to orbit, scroll to zoom (Three.js `OrbitControls`), with a one-click *Reset View* button.
-- **Bilingual phase labels** — current phase displayed in English and Hindi (Devanagari), and a matching phase emoji is appended to the browser tab title.
-- **Starfield backdrop** — 200 procedurally placed emissive stars scattered across the scene.
-- **Zero backend** — a single static front-end bundle; host it anywhere or just run it locally.
+**Core**
+- **Phase-accurate lighting** — a Julian-day lunar algorithm computes the synodic age (29.53059-day cycle) and aims the directional light so the rendered terminator is the real one.
+- **NASA-grade surface** — LROC color-poles map + a normal map + LOLA DEM displacement for real craters and terrain relief.
+- **Interactive 3D** — drag to orbit, scroll to zoom (`OrbitControls`), *Reset View* button.
+- **Bilingual phase labels** — phase name in English and Hindi (Devanagari), plus a phase emoji in the tab title.
+- **Starfield backdrop** — a procedural star layer (single `Points` draw call).
+- **Render-on-demand** — the GPU only works when something changes (drag, date, resize), not 60×/sec.
+- **Zero backend** — a static bundle; host it anywhere.
+
+**Extra features** (hidden by default for a clean view — toggle with the **✨ Features** button)
+- **Moon Data** card — illumination %, moon age, and the next new & full moon.
+- **Time Controls** — ▶/⏸ play, speed (hour/day/week per second), reverse, and a ±1-year scrubber.
+- **View Controls** — Northern/Southern hemisphere flip, shareable `#date=YYYY-MM-DD` URLs, and keyboard shortcuts.
+- **Lunar Features** — Apollo landing sites and named maria/craters as pins with occlusion-aware labels.
+- **Sky Map** — 53 bright catalog stars and 5 constellations (Orion, Big Dipper, Cassiopeia, Cygnus, Leo).
+- **System View** — reveals the Sun and Earth and pulls the camera back so the phase *geometry* is obvious.
+
+**Keyboard** (when not typing in a field): `←`/`→` step a day · `Space` play/pause · `R` reset view · `H` toggle hemisphere.
 
 ## 📦 Installation
 
 Prerequisites: **[Node.js](https://nodejs.org/) 18+** and npm.
 
 ```bash
-git clone https://github.com/<your-user>/Moon-Phase-3D.git
+git clone https://github.com/bhoot1234567890/Moon-Phase-3D.git
 cd Moon-Phase-3D
 npm install
 ```
 
-`npm install` pulls in the only two dependencies declared in `package.json`: `three` (`^0.153.0`) and, as a dev dependency, `vite` (`^4.3.9`).
+Dependencies: `three` (`^0.153.0`) and `vite` (`^4.3.9`, dev). That's it — tests use Node's built-in `node:test`, no test framework to install.
 
 ## 🚀 Usage
 
-Start the Vite dev server:
-
 ```bash
-npm run dev
+npm run dev       # Vite dev server → http://localhost:5173
+npm run build     # production build → dist/
+npm run preview   # serve the production build locally
+npm run host      # dev server exposed on your LAN (--host)
+npm test          # unit tests for the phase math (node:test)
 ```
 
-Vite prints a local URL (default `http://localhost:5173`). Open it and you'll see the Moon rendered with tonight's phase, the phase name in English + Hindi, and a *Reset View* button. Drag to orbit, scroll to zoom.
+## ☁️ Deploy (Cloudflare Pages)
 
-Other scripts shipped in `package.json`:
+The site is a static bundle — deploy `dist/` to Cloudflare Pages with the Wrangler CLI:
 
 ```bash
-npm run build      # production build → dist/
-npm run preview    # serve the production build locally
-npm run host       # dev server exposed on your LAN (--host)
+npm run build
+npx wrangler pages deploy dist --project-name=moon-phase-3d --branch=main
 ```
+
+Or the one-liner: `npm run deploy` (runs the build then deploys).
+
+- **Project:** `moon-phase-3d`
+- **Production URL:** <https://moon-phase-3d.pages.dev>
+- First-time setup: `npx wrangler login`, then `npx wrangler pages project create moon-phase-3d --production-branch=main`.
 
 ## 🧱 How it works
 
 ```mermaid
 flowchart LR
-    A[System date] --> B[Julian-day conversion]
-    B --> C["moon_day()<br/>synodic age 0–1"]
-    C --> D["Phase angle<br/>age × 360°"]
-    D --> E[Sun-light position]
-    D --> F[Phase label + emoji]
-    E --> G[Textured moon sphere]
-    G --> H[Three.js render loop]
+    A[Date] --> B["moonphase.js<br/>Julian-day → synodic age"]
+    B --> C["Phase angle + index"]
+    C --> D[Sun-light position]
+    C --> E[Phase label + emoji]
+    D --> F[Textured moon globe]
+    F --> G["ctx → feature modules"]
+    G --> H[Render on demand]
 ```
 
-1. **Phase math** — `main.js` converts the current date to a Julian day, then iterates a classic lunar-position series (sun/moon mean anomalies, latitude argument, and perturbation corrections) to find the most recent new moon and the current age within the 29.53059-day cycle.
-2. **Sun angle** — the age maps to a 0–360° angle; a polar-to-rectangular conversion places the directional light so the lit/dark boundary on the sphere mirrors the real terminator.
-3. **Rendering** — a 64-segment `SphereGeometry` is shaded with the LROC color texture (also used as a displacement map) and a normal map; 200 randomly placed star meshes sit behind it.
-4. **Interaction** — `OrbitControls` drives camera orbit/zoom, and the *Reset View* button calls `controls.reset()`.
+- **Phase math** lives in `moonphase.js` — a pure, dependency-free module (`getJulian`, `moonDay`, `phaseAngle`, `phaseIndex`) that's unit-tested. It converts a date to a Julian day, iterates a classic lunar-position series to find the last new moon and the age within the cycle.
+- **App context (`ctx`)** — `main.js` builds a shared context (scene refs, a single date source of truth, an event bus, render hooks) that every feature module builds against. Features never touch the scene directly.
+- **Rendering** — a 64-segment sphere with LROC color + normal + DEM displacement; the directional light orbits the moon at radius 80 to set the phase. The frame only re-renders on demand.
+- **Features** — each in `features/*.js` exports `init(ctx)`; the master toggle hides/shows them all.
 
 ## ⚙️ Project layout
 
 | Path | Purpose |
 | --- | --- |
-| `index.html` | Page shell, canvas, UI overlays |
-| `main.js` | Phase calculation, Three.js scene, render loop |
-| `style.css` | Overlays, fonts, buttons |
-| `assets/` | LROC color map, normal/displacement maps, space texture |
-| `Fonts/` | Saturday Moon, Khand, Yatra, Majestic display fonts |
+| `index.html` | Page shell, canvas, UI overlays, toolbar |
+| `main.js` | Scene setup, the `ctx` context, feature wiring |
+| `moonphase.js` | Pure lunar-phase astronomy (unit-tested) |
+| `calendar.js` | Custom on-brand date picker |
+| `features/*.js` | Pluggable features (data panel, time, view, lunar, sky, system) |
+| `style.css` | Overlays, fonts, buttons, toolbar |
+| `vite.config.js` | Vendor chunk split, build target |
+| `assets/` | LROC color map, normal map, LOLA DEM (WebP) |
+| `Fonts/` | Subset WOFF2 display fonts (Saturday Moon, Khand, Yatra, Majestic) |
 
 ## 🤝 Contributing
 
-This is a small personal project. If you spot a bug or want to improve the phase accuracy, open an issue or pull request — keep changes scoped to `main.js` for logic and `assets/` for textures.
+Small personal project. Keep pure logic in `moonphase.js`, rendering/wiring in `main.js`, and self-contained features in `features/*.js` (each builds only against the `ctx` contract). Run `npm test` and `npm run build` before submitting.
 
 ## 📄 License
 
-No license file is present in this repository. Absent one, the code is **all rights reserved** by default; contact the repository owner before reusing it.
+No license file is present. Absent one, the code is **all rights reserved** by default; contact the repository owner before reusing it. (Textures are NASA LRO/LOLA-derived; fonts retain their respective licenses.)
