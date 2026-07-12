@@ -17,6 +17,7 @@ import {
   SRGBColorSpace,
 } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
+import { phaseAngle, phaseIndex } from "./moonphase.js";
 
 // Importing assets as modules lets Vite hash + emit them in production builds
 // (referencing them as bare string paths to a non-public/ dir 404s in `vite build`).
@@ -46,64 +47,6 @@ const moon_phases_hi = [
 ];
 const moon_phases_emoji = ["🌑", "🌒", "🌓", "🌔", "🌕", "🌖", "🌗", "🌘"];
 
-// --- Lunar-phase solver: Julian day → synodic age (0..1) ---
-Date.prototype.getJulian = function () {
-  return this / 86400000 - this.getTimezoneOffset() / 1440 + 2440587.5;
-};
-function moon_day(today) {
-  var GetFrac = function (fr) {
-    return fr - Math.floor(fr);
-  };
-  var thisJD = today.getJulian();
-  var year = today.getFullYear();
-  var degToRad = 3.14159265 / 180;
-  var K0, T, T2, T3, J0, F0, M0, M1, B1, oldJ;
-  K0 = Math.floor((year - 1900) * 12.3685);
-  T = (year - 1899.5) / 100;
-  T2 = T * T;
-  T3 = T * T * T;
-  J0 = 2415020 + 29 * K0;
-  F0 =
-    0.0001178 * T2 -
-    0.000000155 * T3 +
-    (0.75933 + 0.53058868 * K0) -
-    (0.000837 * T + 0.000335 * T2);
-  M0 =
-    360 * GetFrac(K0 * 0.08084821133) +
-    359.2242 -
-    0.0000333 * T2 -
-    0.00000347 * T3;
-  M1 =
-    360 * GetFrac(K0 * 0.07171366128) +
-    306.0253 +
-    0.0107306 * T2 +
-    0.00001236 * T3;
-  B1 =
-    360 * GetFrac(K0 * 0.08519585128) +
-    21.2964 -
-    0.0016528 * T2 -
-    0.00000239 * T3;
-  var phase = 0;
-  var jday = 0;
-  while (jday < thisJD) {
-    var F = F0 + 1.530588 * phase;
-    var M5 = (M0 + phase * 29.10535608) * degToRad;
-    var M6 = (M1 + phase * 385.81691806) * degToRad;
-    var B6 = (B1 + phase * 390.67050646) * degToRad;
-    F -= 0.4068 * Math.sin(M6) + (0.1734 - 0.000393 * T) * Math.sin(M5);
-    F += 0.0161 * Math.sin(2 * M6) + 0.0104 * Math.sin(2 * B6);
-    F -= 0.0074 * Math.sin(M5 - M6) - 0.0051 * Math.sin(M5 + M6);
-    F += 0.0021 * Math.sin(2 * M5) + 0.001 * Math.sin(2 * B6 - M6);
-    F += 0.5 / 1440;
-    oldJ = jday;
-    jday = J0 + 28 * phase + Math.floor(F);
-    phase++;
-  }
-
-  // 29.53059 days per lunar month
-  return (thisJD - oldJ) / 29.53059;
-}
-
 // --- Scene / camera / renderer ---
 const scene = new Scene();
 const camera = new PerspectiveCamera(
@@ -112,14 +55,25 @@ const camera = new PerspectiveCamera(
   0.1,
   1000
 );
+// MSAA only on low-density displays: at dpr >= 3 the physical pixels are small
+// enough to hide edge aliasing, so skip the fill-cost multiplier there.
+const antialias = window.devicePixelRatio < 3;
 const renderer = new WebGLRenderer({
   canvas: document.querySelector("#bg"),
-  antialias: true,
+  antialias,
 });
 // Cap at 2: above dpr=2 the extra sharpness is imperceptible but fill cost scales with dpr².
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 camera.position.set(0, 0, 80);
+
+// Survive GPU context loss (long backgrounding, driver reset): keep the context
+// restorable, then re-render on restore — three re-uploads textures lazily.
+const canvas = renderer.domElement;
+canvas.addEventListener("webglcontextlost", (e) => e.preventDefault());
+canvas.addEventListener("webglcontextrestored", () =>
+  renderer.render(scene, camera)
+);
 
 // Phase is conveyed entirely by where the sun sits around the moon.
 const directionalLight = new DirectionalLight(0xffffff, 2);
@@ -162,7 +116,7 @@ const moonHeightTex = loader.load(moonHeightUrl); // LOLA DEM, drives displaceme
 
 // --- Moon globe: real DEM displacement; normal map carries the surface relief ---
 const moon = new Mesh(
-  new SphereGeometry(20, 96, 96),
+  new SphereGeometry(20, 64, 64),
   new MeshStandardMaterial({
     map: moonColorTex,
     normalMap: moonNormalTex,
@@ -176,8 +130,8 @@ directionalLight.target = moon;
 
 // --- Set the moon phase for a date: repositions the sun + updates the labels ---
 function applyPhase(date) {
-  const a = moon_day(date) * 360;
-  const idx = ((Math.round(a / 45) % 8) + 8) % 8;
+  const a = phaseAngle(date);
+  const idx = phaseIndex(date);
   const sunangle = (a + 270) % 360;
   const rad = (sunangle * Math.PI) / 180;
   directionalLight.position.set(80 * Math.cos(rad), 0, 80 * Math.sin(rad));
