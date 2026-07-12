@@ -1,0 +1,8 @@
+* text=auto eol=lf
+
+# Binary assets — never apply text diff/merge or EOL reflow
+*.png binary
+*.jpg binary
+*.webp binary
+*.woff2 binary
+*.ttf binary
